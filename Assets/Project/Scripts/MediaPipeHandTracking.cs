@@ -138,15 +138,17 @@ public class MediaPipeHandTracking : MonoBehaviour
                     handPoseEstimator.visualize(rgbaMat, hand, true, true);
                     var handEstimationData = handPoseEstimator.getData(hand);
                     Vector3[] handWorldLandmarks = ConvertMatToVector(hand);
+                    Vector3 handNormal = CalculateHandNormal(handWorldLandmarks[0], handWorldLandmarks[5], handWorldLandmarks[17]);
                     //if is left hand
-                    if(handEstimationData.handedness <= 0.5f)
+                    if (handEstimationData.handedness <= 0.5f)
                     {
                         if (skeletonVisualizer_leftHand != null && skeletonVisualizer_leftHand.showSkeleton && toGenie_leftHand != null)
                         {
-                            skeletonVisualizer_leftHand.UpdatePose(hand);
+                            // Invert the direction of normal to inside of the hand
+                            handNormal *= -1;
+                            skeletonVisualizer_leftHand.UpdatePoseAndNormal(handWorldLandmarks, handNormal);
                             // CacheLandmarkInfo(bool isLefthand,Vector3[] landmarks_world_buffer);
                             landmarks_world_cache_leftHand.Add(handWorldLandmarks);
-                            CalculateHandNormal(handWorldLandmarks[0], handWorldLandmarks[5], handWorldLandmarks[17]);
                             //toGenie_leftHand.UpdatePose(handWorldLandmarks);
 
                         }
@@ -156,10 +158,9 @@ public class MediaPipeHandTracking : MonoBehaviour
                     {
                         if (skeletonVisualizer_rightHand != null && skeletonVisualizer_rightHand.showSkeleton && toGenie_rightHand != null)
                         {
-                            skeletonVisualizer_rightHand.UpdatePose(hand);
+                            skeletonVisualizer_rightHand.UpdatePoseAndNormal(handWorldLandmarks, handNormal);
                             // CacheLandmarkInfo(bool isLefthand,Vector3[] landmarks_world_buffer);
                             landmarks_world_cache_rightHand.Add(handWorldLandmarks);
-                            CalculateHandNormal(handWorldLandmarks[0], handWorldLandmarks[5], handWorldLandmarks[17]);
                             //toGenie_rightHand.UpdatePose(handWorldLandmarks);
                         }
                     }
@@ -288,8 +289,7 @@ public class MediaPipeHandTracking : MonoBehaviour
         Vector3 Line1 = landmark5 - landmark0;
         Vector3 Line2 = landmark17 - landmark0;
 
-        Vector3 crossProduct = Vector3.Cross(Line1, Line2);
-        print(crossProduct);
+        Vector3 crossProduct = Vector3.Cross(Line1, Line2).normalized;
         return crossProduct;
     }
 }
