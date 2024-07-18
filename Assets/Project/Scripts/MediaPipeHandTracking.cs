@@ -7,11 +7,21 @@ using OpenCVForUnityExample.DnnModel;
 using OpenCVForUnity.ImgprocModule;
 using System.Collections.Generic;
 using System.Text;
-
+using System;
 
 [RequireComponent(typeof(WebCamTextureToMatHelper))]
 public class MediaPipeHandTracking : MonoBehaviour
 {
+    public MediaPipeHandPoseSkeletonVisualizer skeletonVisualizer_leftHand;
+    public MediaPipeHandPoseSkeletonVisualizer skeletonVisualizer_rightHand;
+
+    public MediaPipeHandToGenieHand toGenie_leftHand;
+    public MediaPipeHandToGenieHand toGenie_rightHand;
+
+    private Vector3[] landmarks_world_buffer;
+    private CappedList<Vector3[]> landmarks_world_cache_leftHand;
+    private CappedList<Vector3[]> landmarks_world_cache_rightHand;
+
     // The webcam texture to mat helper.
     WebCamTextureToMatHelper webCamTextureToMatHelper;
 
@@ -123,15 +133,41 @@ public class MediaPipeHandTracking : MonoBehaviour
 
                 Imgproc.cvtColor(bgrMat, rgbaMat, Imgproc.COLOR_BGR2RGBA);
 
-                //palmDetector.visualize(rgbaMat, palms, false, true);
                 foreach (var hand in hands)
                 {
                     handPoseEstimator.visualize(rgbaMat, hand, true, true);
+                    var handEstimationData = handPoseEstimator.getData(hand);
+                    Vector3[] handWorldLandmarks = ConvertMatToVector(hand);
+                    //if is left hand
+                    if(handEstimationData.handedness <= 0.5f)
+                    {
+                        if (skeletonVisualizer_leftHand != null && skeletonVisualizer_leftHand.showSkeleton && toGenie_leftHand != null)
+                        {
+                            skeletonVisualizer_leftHand.UpdatePose(hand);
+                            // CacheLandmarkInfo(bool isLefthand,Vector3[] landmarks_world_buffer);
+                            landmarks_world_cache_leftHand.Add(handWorldLandmarks);
+                            CalculateHandNormal(handWorldLandmarks[0], handWorldLandmarks[5], handWorldLandmarks[17]);
+                            //toGenie_leftHand.UpdatePose(handWorldLandmarks);
+
+                        }
+                    }
+                    //if is right hand
+                    else
+                    {
+                        if (skeletonVisualizer_rightHand != null && skeletonVisualizer_rightHand.showSkeleton && toGenie_rightHand != null)
+                        {
+                            skeletonVisualizer_rightHand.UpdatePose(hand);
+                            // CacheLandmarkInfo(bool isLefthand,Vector3[] landmarks_world_buffer);
+                            landmarks_world_cache_rightHand.Add(handWorldLandmarks);
+                            CalculateHandNormal(handWorldLandmarks[0], handWorldLandmarks[5], handWorldLandmarks[17]);
+                            //toGenie_rightHand.UpdatePose(handWorldLandmarks);
+                        }
+                    }
                 }
-    
+
             }
 
-            //Utils.matToTexture2D(rgbaMat, texture);
+            //Take landmark #0, #5 and #17 to calculate the normal of hand
         }
     }
 
@@ -143,7 +179,7 @@ public class MediaPipeHandTracking : MonoBehaviour
 
         if (string.IsNullOrEmpty(palm_detection_model_filepath))
         {
-            Debug.LogError(PALM_DETECTION_MODEL_FILENAME + " is not loaded. Please read “StreamingAssets/OpenCVForUnity/dnn/setup_dnn_module.pdf” to make the necessary setup.");
+            Debug.LogError(PALM_DETECTION_MODEL_FILENAME + " is not loaded. Please read ?StreamingAssets/OpenCVForUnity/dnn/setup_dnn_module.pdf? to make the necessary setup.");
         }
         else
         {
@@ -152,7 +188,7 @@ public class MediaPipeHandTracking : MonoBehaviour
 
         if (string.IsNullOrEmpty(handpose_estimation_model_filepath))
         {
-            Debug.LogError(HANDPOSE_ESTIMATION_MODEL_FILENAME + " is not loaded. Please read “StreamingAssets/OpenCVForUnity/dnn/setup_dnn_module.pdf” to make the necessary setup.");
+            Debug.LogError(HANDPOSE_ESTIMATION_MODEL_FILENAME + " is not loaded. Please read ?StreamingAssets/OpenCVForUnity/dnn/setup_dnn_module.pdf? to make the necessary setup.");
         }
         else
         {
@@ -160,6 +196,9 @@ public class MediaPipeHandTracking : MonoBehaviour
         }
 
         webCamTextureToMatHelper.Initialize();
+
+        landmarks_world_cache_leftHand = new CappedList<Vector3[]>();
+        landmarks_world_cache_rightHand = new CappedList<Vector3[]>();
     }
 
     // Raises the webcam texture to mat helper initialized event.
@@ -227,4 +266,80 @@ public class MediaPipeHandTracking : MonoBehaviour
 #endif
     }
 
+    public Vector3[] ConvertMatToVector(Mat result)
+    {
+        if (result.empty() || result.rows() < 132)
+        {
+            Debug.Log("Mat result invalid");
+            return null;
+        }
+
+        if (landmarks_world_buffer == null)
+            landmarks_world_buffer = new Vector3[21];
+
+        // Copy only world landmarks data from pose data.
+        MatUtils.copyFromMat<Vector3>(result.rowRange(67, 67 + 63), landmarks_world_buffer);
+
+        return landmarks_world_buffer;
+    }
+
+    public Vector3 CalculateHandNormal(Vector3 landmark0, Vector3 landmark5, Vector3 landmark17)
+    {
+        Vector3 Line1 = landmark5 - landmark0;
+        Vector3 Line2 = landmark17 - landmark0;
+
+        Vector3 crossProduct = Vector3.Cross(Line1, Line2);
+        print(crossProduct);
+        return crossProduct;
+    }
+}
+
+
+public class CappedList<T>
+{
+    private const int MaxSize = 10;
+    private List<T> internalList = new List<T>();
+
+    public void Add(T item)
+    {
+        if (internalList.Count >= MaxSize)
+        {
+            internalList.RemoveAt(0); // Remove the first element
+        }
+        internalList.Add(item); // Add the new element at the end
+    }
+
+    public void Remove(T item)
+    {
+        internalList.Remove(item);
+    }
+
+    public T this[int index]
+    {
+        get { return internalList[index]; }
+        set { internalList[index] = value; }
+    }
+
+    public int Count
+    {
+        get { return internalList.Count; }
+    }
+
+    public void Clear()
+    {
+        internalList.Clear();
+    }
+
+    public bool Contains(T item)
+    {
+        return internalList.Contains(item);
+    }
+
+    public void PrintAllItems()
+    {
+        foreach (var item in internalList)
+        {
+            Debug.Log(item);
+        }
+    }
 }

@@ -685,36 +685,6 @@ namespace OpenCVForUnity.UnityUtils.Helper
                 }
             }
 
-            if (webCamTexture == null)
-            {
-                if (devices.Length > 0)
-                {
-                    webCamDevice = devices[0];
-
-                    if (avoidAndroidFrontCameraLowLightIssue && webCamDevice.isFrontFacing == true)
-                        requestedFPS = 15f;
-
-                    if (requestedFPS < 0)
-                    {
-                        webCamTexture = new WebCamTexture(webCamDevice.name, requestedWidth, requestedHeight);
-                    }
-                    else
-                    {
-                        webCamTexture = new WebCamTexture(webCamDevice.name, requestedWidth, requestedHeight, (int)requestedFPS);
-                    }
-                }
-                else
-                {
-                    isInitWaiting = false;
-                    initCoroutine = null;
-
-                    if (onErrorOccurred != null)
-                        onErrorOccurred.Invoke(ErrorCode.CAMERA_DEVICE_NOT_EXIST);
-
-                    yield break;
-                }
-            }
-
             // Starts the camera
             webCamTexture.Play();
 
