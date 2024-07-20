@@ -12,8 +12,10 @@ using System;
 [RequireComponent(typeof(WebCamTextureToMatHelper))]
 public class MediaPipeHandTracking : MonoBehaviour
 {
-    public MediaPipeHandPoseSkeletonVisualizer skeletonVisualizer_leftHand;
-    public MediaPipeHandPoseSkeletonVisualizer skeletonVisualizer_rightHand;
+    public MediaPipeHandTrackingUtils skeletonVisualizer_leftHand;
+    public MediaPipeHandTrackingUtils skeletonVisualizer_rightHand;
+    public DrawTriangle palmVisualizer_leftHand;
+    public DrawTriangle palmVisualizer_rightHand;
 
     public MediaPipeHandToGenieHand toGenie_leftHand;
     public MediaPipeHandToGenieHand toGenie_rightHand;
@@ -21,6 +23,9 @@ public class MediaPipeHandTracking : MonoBehaviour
     private Vector3[] landmarks_world_buffer;
     private CappedList<Vector3[]> landmarks_world_cache_leftHand;
     private CappedList<Vector3[]> landmarks_world_cache_rightHand;
+
+    private CappedList<Vector3> normal_cache_leftHand;
+    private CappedList<Vector3> normal_cache_rightHand;
 
     // The webcam texture to mat helper.
     WebCamTextureToMatHelper webCamTextureToMatHelper;
@@ -144,13 +149,25 @@ public class MediaPipeHandTracking : MonoBehaviour
                     {
                         if (skeletonVisualizer_leftHand != null && skeletonVisualizer_leftHand.showSkeleton && toGenie_leftHand != null)
                         {
-                            // Invert the direction of normal to inside of the hand
+                            // Smooth the normal based on the previous frame of normal
                             handNormal *= -1;
-                            skeletonVisualizer_leftHand.UpdatePoseAndNormal(handWorldLandmarks, handNormal);
-                            // CacheLandmarkInfo(bool isLefthand,Vector3[] landmarks_world_buffer);
-                            landmarks_world_cache_leftHand.Add(handWorldLandmarks);
-                            //toGenie_leftHand.UpdatePose(handWorldLandmarks);
+                            if (normal_cache_leftHand.Count != 0)
+                            {
+                                handNormal = CalculateWeightedAverage(normal_cache_leftHand[normal_cache_leftHand.Count - 1], handNormal, 7);
+                            }
 
+                            // Invert the direction of normal to inside of the hand (ONLY LEFT HAND)
+
+                            skeletonVisualizer_leftHand.UpdatePoseAndNormal(handWorldLandmarks, handNormal);
+                            palmVisualizer_leftHand.DrawTriangleUtils(skeletonVisualizer_leftHand.MappingCoordinate(handWorldLandmarks[0]),
+                                skeletonVisualizer_leftHand.MappingCoordinate(handWorldLandmarks[5]),
+                                skeletonVisualizer_leftHand.MappingCoordinate(handWorldLandmarks[17]));
+                            // CacheLandmarkInfo(bool isLefthand,Vector3[] landmarks_world_buffer);
+
+                            normal_cache_leftHand.Add(handNormal);
+                            landmarks_world_cache_leftHand.Add(handWorldLandmarks);
+
+                            //toGenie_leftHand.UpdatePose(handWorldLandmarks);
                         }
                     }
                     //if is right hand
@@ -158,9 +175,21 @@ public class MediaPipeHandTracking : MonoBehaviour
                     {
                         if (skeletonVisualizer_rightHand != null && skeletonVisualizer_rightHand.showSkeleton && toGenie_rightHand != null)
                         {
+                            // Smooth the normal based on the previous frame of normal
+                            if(normal_cache_rightHand.Count != 0)
+                            {
+                                handNormal = CalculateWeightedAverage(normal_cache_rightHand[normal_cache_rightHand.Count - 1], handNormal, 7);
+                            }
+
                             skeletonVisualizer_rightHand.UpdatePoseAndNormal(handWorldLandmarks, handNormal);
+                            palmVisualizer_rightHand.DrawTriangleUtils(skeletonVisualizer_rightHand.MappingCoordinate(handWorldLandmarks[17]),
+                                skeletonVisualizer_rightHand.MappingCoordinate(handWorldLandmarks[5]),
+                                skeletonVisualizer_rightHand.MappingCoordinate(handWorldLandmarks[0]));
                             // CacheLandmarkInfo(bool isLefthand,Vector3[] landmarks_world_buffer);
+
+                            normal_cache_rightHand.Add(handNormal);
                             landmarks_world_cache_rightHand.Add(handWorldLandmarks);
+
                             //toGenie_rightHand.UpdatePose(handWorldLandmarks);
                         }
                     }
@@ -200,6 +229,8 @@ public class MediaPipeHandTracking : MonoBehaviour
 
         landmarks_world_cache_leftHand = new CappedList<Vector3[]>();
         landmarks_world_cache_rightHand = new CappedList<Vector3[]>();
+        normal_cache_leftHand = new CappedList<Vector3>();
+        normal_cache_rightHand = new CappedList<Vector3>();
     }
 
     // Raises the webcam texture to mat helper initialized event.
@@ -291,6 +322,11 @@ public class MediaPipeHandTracking : MonoBehaviour
 
         Vector3 crossProduct = Vector3.Cross(Line1, Line2).normalized;
         return crossProduct;
+    }
+
+    public Vector3 CalculateWeightedAverage(Vector3 a, Vector3 b, float weight)
+    {
+        return (weight * a + b) / (weight + 1);
     }
 }
 
