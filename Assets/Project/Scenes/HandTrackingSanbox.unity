@@ -302,7 +302,7 @@ GameObject:
   - component: {fileID: 380873468}
   - component: {fileID: 380873469}
   m_Layer: 0
-  m_Name: HandTrackingManager
+  m_Name: MediaPipeHandTrackingManager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -1296,7 +1296,7 @@ GameObject:
   - component: {fileID: 1527012022}
   - component: {fileID: 1527012021}
   m_Layer: 0
-  m_Name: WebcamManager
+  m_Name: HandTrackingManager
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
